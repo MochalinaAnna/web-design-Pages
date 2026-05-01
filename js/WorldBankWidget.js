@@ -3,7 +3,6 @@ import UIComponent from './UIComponent.js';
 export default class WorldBankWidget extends UIComponent {
     constructor() {
         super('📈 Мировая экономика');
-        // Доступные индикаторы с их источниками
         this.indicators = [
             { name: 'Население мира', source: 'countries' },
             { name: 'Средняя площадь страны', source: 'countries' },
@@ -61,7 +60,7 @@ export default class WorldBankWidget extends UIComponent {
                     throw new Error('Неизвестный источник');
             }
         } catch (error) {
-            console.error('[WorldWidget] Ошибка:', error);
+            console.error('[WorldWidget] Ошибка:', error.message);
             card.innerHTML = `
                 <span class="indicator-label">${indicator.name}</span>
                 <span class="indicator-value">—</span>
@@ -71,13 +70,11 @@ export default class WorldBankWidget extends UIComponent {
         }
     }
 
-    /**
-     * Данные из REST Countries API (уже проверен — работает)
-     */
     async _fetchCountriesData(card, indicator) {
         const response = await fetch('https://restcountries.com/v3.1/all?fields=name,population,area');
-        const countries = await response.json();
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
+        const countries = await response.json();
         let value, formattedValue;
 
         switch (indicator.name) {
@@ -109,9 +106,6 @@ export default class WorldBankWidget extends UIComponent {
         `;
     }
 
-    /**
-     * Данные из CoinGecko API (уже проверен — работает)
-     */
     async _fetchCryptoData(card, indicator) {
         let url;
         
@@ -127,8 +121,9 @@ export default class WorldBankWidget extends UIComponent {
         }
 
         const response = await fetch(url);
-        const data = await response.json();
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
+        const data = await response.json();
         let formattedValue;
 
         if (indicator.name === 'Капитализация Bitcoin') {
@@ -154,9 +149,7 @@ export default class WorldBankWidget extends UIComponent {
         const btn = wrapper.querySelector('.btn-refresh');
         if (btn) {
             this._addEventListener(btn, 'click', async () => {
-                // Выбираем новый случайный индикатор
                 this.currentIndicator = this.indicators[Math.floor(Math.random() * this.indicators.length)];
-                // Обновляем заголовок виджета
                 const titleEl = wrapper.querySelector('.widget-title');
                 if (titleEl) titleEl.textContent = `📈 ${this.currentIndicator.name}`;
                 await this._fetchData(wrapper);
