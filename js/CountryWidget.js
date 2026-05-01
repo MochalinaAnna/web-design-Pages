@@ -35,20 +35,28 @@ export default class CountryWidget extends UIComponent {
         const card = wrapper.querySelector(`#country-card-${this.id}`);
         if (!card) return;
 
-        card.innerHTML = '<p>⏳ Загрузка...</p>';
+        card.innerHTML = '<p>⏳ Загрузка данных о стране...</p>';
 
         try {
-            // 1. Получаем случайную страну (REST Countries API — работает без CORS)
+            // 1. Получаем случайную страну
             const countryResponse = await fetch(
-                'https://restcountries.com/v3.1/all?fields=name,flags,population,area,capital,currencies,gdp,continents'
+                'https://restcountries.com/v3.1/all?fields=name,flags,population,area,capital,currencies,continents,cca3'
             );
             const countries = await countryResponse.json();
             const country = countries[Math.floor(Math.random() * countries.length)];
 
-            // Определяем код валюты (берём первую, если несколько)
+            // Данные страны
+            const countryName = country.name.common;
+            const countryCode = country.cca3; // Трёхбуквенный код (RUS, USA и т.д.)
+            const population = country.population || 0;
+            const area = country.area || 0;
+            const density = area > 0 ? (population / area).toFixed(1) : '—';
+            const continents = country.continents?.join(', ') || '';
+            const capital = country.capital?.[0] || '—';
+
+            // Валюта
             let currencyCode = null;
             let currencyName = 'неизвестно';
-            
             if (country.currencies) {
                 const codes = Object.keys(country.currencies);
                 if (codes.length > 0) {
@@ -57,7 +65,17 @@ export default class CountryWidget extends UIComponent {
                 }
             }
 
-            // 2. Получаем курсы валют (Open Exchange Rates API — работает без CORS)
+            // 2. Получаем реальный ВВП на душу через World Bank API (через CORS-прокси)
+            card.innerHTML = '<p>⏳ Загружаю ВВП...</p>';
+            
+            let gdpPerCapita = await this._fetchGDPPerCapita(countryCode);
+
+            // Если ВВП не найден — пробуем через название страны
+            if (!gdpPerCapita) {
+                gdpPerCapita = await this._fetchGDPByCountryName(countryName);
+            }
+
+            // 3. Получаем курс валюты
             let exchangeRate = null;
             if (currencyCode) {
                 try {
@@ -69,49 +87,18 @@ export default class CountryWidget extends UIComponent {
                 }
             }
 
-            // 3. Вычисляем показатели
-            const population = country.population || 0;
-            const area = country.area || 0;
-            const density = area > 0 ? (population / area).toFixed(1) : '—';
-            
-            // ВВП на душу населения (есть в API не у всех стран, поэтому рассчитываем)
-            let gdpPerCapita = null;
-            
-            // Пробуем получить из gdp полей
-            if (country.gdp) {
-                // gdp — объект с ключами валют
-                const gdpValues = Object.values(country.gdp);
-                if (gdpValues.length > 0 && population > 0) {
-                    gdpPerCapita = gdpValues[0] / population;
-                }
+            // 4. Если ВВП всё ещё нет — оцениваем по региону
+            if (!gdpPerCapita || gdpPerCapita <= 0) {
+                gdpPerCapita = this._estimateGDP(continents);
             }
 
-            // Если ВВП не нашёлся — берём примерный средний
-            if (!gdpPerCapita || isNaN(gdpPerCapita)) {
-                // Среднемировой ВВП на душу ~$13,000 (2023)
-                gdpPerCapita = 13000;
-            }
+            // 5. Рассчитываем Индекс Биг-Мака
+            // Формула: сколько Биг-Маков можно купить на месячный ВВП на душу
+            const monthlyGDP = gdpPerCapita / 12;
+            const bigMacIndex = Math.floor(monthlyGDP / this.bigMacPriceUSD);
 
-            // 4. Рассчитываем Индекс Биг-Мака
-            let bigMacIndex = null;
-            let bigMacDescription = '';
-
-            if (exchangeRate && currencyCode) {
-                // Цена Биг-Мака в местной валюте
-                const localBigMacPrice = this.bigMacPriceUSD * exchangeRate;
-                // Сколько Биг-Маков можно купить на месячный ВВП на душу
-                const monthlyGDP = gdpPerCapita / 12;
-                bigMacIndex = Math.floor(monthlyGDP / localBigMacPrice);
-                bigMacDescription = `по курсу: $1 = ${exchangeRate.toFixed(2)} ${currencyCode}`;
-            } else {
-                // Если курс неизвестен — считаем в USD напрямую
-                const monthlyGDP = gdpPerCapita / 12;
-                bigMacIndex = Math.floor(monthlyGDP / this.bigMacPriceUSD);
-                bigMacDescription = 'расчёт в USD (курс локальной валюты не найден)';
-            }
-
-            // Форматирование для отображения
-            const formattedGDP = gdpPerCapita >= 1000 
+            // 6. Форматируем
+            const formattedGDP = gdpPerCapita >= 1000
                 ? `$${(gdpPerCapita / 1000).toFixed(1)} тыс`
                 : `$${gdpPerCapita.toFixed(0)}`;
 
@@ -123,16 +110,20 @@ export default class CountryWidget extends UIComponent {
                 ? `${(area / 1_000_000).toFixed(1)} млн км²`
                 : `${area.toLocaleString('ru-RU')} км²`;
 
-            // 5. Отрисовываем красивую карточку
+            const rateInfo = exchangeRate && currencyCode
+                ? `1 USD = ${exchangeRate.toFixed(2)} ${currencyCode}`
+                : 'курс не найден';
+
+            // 7. Отрисовка
             card.innerHTML = `
-                <img src="${country.flags.svg}" alt="Флаг ${country.name.common}" class="country-flag">
-                <h3>${country.name.common}</h3>
-                ${country.continents ? `<p class="country-continent">${country.continents.join(', ')}</p>` : ''}
+                <img src="${country.flags.svg}" alt="Флаг ${countryName}" class="country-flag">
+                <h3>${countryName}</h3>
+                ${continents ? `<p class="country-continent">${continents}</p>` : ''}
                 
                 <div class="country-stats">
                     <div class="stat-row">
                         <span class="stat-label">🏙️ Столица</span>
-                        <span class="stat-value">${country.capital ? country.capital[0] : '—'}</span>
+                        <span class="stat-value">${capital}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">👥 Население</span>
@@ -147,12 +138,12 @@ export default class CountryWidget extends UIComponent {
                         <span class="stat-value">${density} чел/км²</span>
                     </div>
                     <div class="stat-row stat-highlight">
-                        <span class="stat-label">💰 ВВП на душу</span>
+                        <span class="stat-label">💰 ВВП на душу (год)</span>
                         <span class="stat-value">${formattedGDP}</span>
                     </div>
                     <div class="stat-row stat-highlight">
                         <span class="stat-label">💵 Валюта</span>
-                        <span class="stat-value">${currencyCode || '—'} (${currencyName})</span>
+                        <span class="stat-value">${currencyCode || '—'}</span>
                     </div>
                 </div>
 
@@ -161,15 +152,95 @@ export default class CountryWidget extends UIComponent {
                         <span class="burger-icon">🍔</span>
                         <span>Индекс Биг-Мака</span>
                     </div>
-                    <div class="bigmac-value">${bigMacIndex || '—'}</div>
+                    <div class="bigmac-value">${bigMacIndex.toLocaleString('ru-RU')}</div>
                     <div class="bigmac-unit">Биг-Маков в месяц</div>
-                    <div class="bigmac-desc">${bigMacDescription}</div>
+                    <div class="bigmac-desc">
+                        На среднюю зарплату можно купить ${bigMacIndex} Биг-Маков<br>
+                        <small>🍔 = $${this.bigMacPriceUSD} | ${rateInfo}</small>
+                    </div>
                 </div>
             `;
         } catch (error) {
             console.error('[CountryWidget] Ошибка:', error);
             card.innerHTML = '<p>❌ Не удалось загрузить данные. Попробуйте снова.</p>';
         }
+    }
+
+    /**
+     * Получает ВВП на душу населения через World Bank API (через CORS-прокси)
+     */
+    async _fetchGDPPerCapita(countryCode) {
+        try {
+            // Используем CORS-прокси для обхода блокировки
+            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            const apiUrl = encodeURIComponent(
+                `https://api.worldbank.org/v2/country/${countryCode}/indicator/NY.GDP.PCAP.CD?format=json&per_page=1&mrnev=1`
+            );
+            
+            const response = await fetch(proxyUrl + apiUrl);
+            if (!response.ok) return null;
+            
+            const data = await response.json();
+            
+            if (data && data[1] && data[1][0] && data[1][0].value) {
+                return data[1][0].value;
+            }
+            return null;
+        } catch (e) {
+            console.warn(`Не удалось получить ВВП для ${countryCode}:`, e.message);
+            return null;
+        }
+    }
+
+    /**
+     * Запасной метод: ищем ВВП через API всех стран
+     */
+    async _fetchGDPByCountryName(countryName) {
+        try {
+            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            const apiUrl = encodeURIComponent(
+                `https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD?format=json&per_page=300&mrnev=1`
+            );
+            
+            const response = await fetch(proxyUrl + apiUrl);
+            if (!response.ok) return null;
+            
+            const data = await response.json();
+            
+            if (data && data[1]) {
+                const record = data[1].find(r => 
+                    r && r.country?.value?.toLowerCase() === countryName.toLowerCase() && r.value
+                );
+                if (record) return record.value;
+            }
+            return null;
+        } catch (e) {
+            console.warn('Не удалось найти ВВП по названию страны:', e.message);
+            return null;
+        }
+    }
+
+    /**
+     * Оценка ВВП по региону, если API не дал данных
+     */
+    _estimateGDP(continents) {
+        const regionalGDP = {
+            'Europe': 35000,
+            'North America': 45000,
+            'South America': 9000,
+            'Asia': 8000,
+            'Africa': 2500,
+            'Oceania': 30000,
+            'Antarctica': 0,
+        };
+
+        // Ищем первый подходящий континент
+        for (const [continent, gdp] of Object.entries(regionalGDP)) {
+            if (continents.includes(continent)) return gdp;
+        }
+
+        // Если не нашли — среднемировой
+        return 13000;
     }
 
     _setupRefresh(wrapper) {
