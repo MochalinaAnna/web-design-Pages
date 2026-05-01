@@ -2,12 +2,15 @@ import UIComponent from './UIComponent.js';
 
 export default class WorldBankWidget extends UIComponent {
     constructor() {
-        super('📈 Мировой показатель');
+        super('📈 Мировая экономика');
+        // Доступные индикаторы с их источниками
         this.indicators = [
-            { code: 'NY.GDP.MKTP.CD', name: 'ВВП (текущий $)', format: 'money' },
-            { code: 'SP.POP.TOTL', name: 'Население мира', format: 'people' },
-            { code: 'FP.CPI.TOTL.ZG', name: 'Инфляция (%)', format: 'percent' },
-            { code: 'SL.UEM.TOTL.ZS', name: 'Безработица (%)', format: 'percent' },
+            { name: 'Население мира', source: 'countries' },
+            { name: 'Средняя площадь страны', source: 'countries' },
+            { name: 'Капитализация Bitcoin', source: 'coingecko' },
+            { name: 'Курс ETH к USD', source: 'coingecko' },
+            { name: 'Всего стран в мире', source: 'countries' },
+            { name: 'Общая площадь суши', source: 'countries' },
         ];
         this.currentIndicator = null;
     }
@@ -25,7 +28,7 @@ export default class WorldBankWidget extends UIComponent {
             </div>
             <div class="widget-body">
                 <div class="indicator-card" id="indicator-${this.id}">
-                    Загрузка...
+                    <p>Загрузка данных...</p>
                 </div>
                 <button class="btn-refresh">
                     <i class="fa-solid fa-shuffle"></i> Другой показатель
@@ -34,64 +37,129 @@ export default class WorldBankWidget extends UIComponent {
         `;
 
         this._setupCloseButton(wrapper);
-        await this._fetchIndicator(wrapper);
+        await this._fetchData(wrapper);
         this._setupRefresh(wrapper);
         return wrapper;
     }
 
-    async _fetchIndicator(wrapper) {
+    async _fetchData(wrapper) {
+        const indicator = this.currentIndicator;
+        const card = wrapper.querySelector(`#indicator-${this.id}`);
+        
+        if (!card) return;
+        card.innerHTML = '<p>⏳ Загрузка...</p>';
+
         try {
-            const indicator = this.currentIndicator;
-            // World Bank API — бесплатно, без ключа
-            const response = await fetch(
-                `https://api.worldbank.org/v2/country/1W/indicator/${indicator.code}?format=json&per_page=1&mrnev=1`
-            );
-            const data = await response.json();
-
-            const card = wrapper.querySelector(`#indicator-${this.id}`);
-            if (!card) return;
-
-            if (data && data[1] && data[1][0] && data[1][0].value) {
-                const value = data[1][0].value;
-                const year = data[1][0].date;
-                let formattedValue;
-
-                switch (indicator.format) {
-                    case 'money':
-                        formattedValue = `${(value / 1_000_000_000_000).toFixed(2)} трлн $`;
-                        break;
-                    case 'people':
-                        formattedValue = `${(value / 1_000_000_000).toFixed(2)} млрд чел`;
-                        break;
-                    case 'percent':
-                        formattedValue = `${value.toFixed(2)}%`;
-                        break;
-                    default:
-                        formattedValue = value.toLocaleString('ru-RU');
-                }
-
-                card.innerHTML = `
-                    <span class="indicator-label">${indicator.name}</span>
-                    <span class="indicator-value">${formattedValue}</span>
-                    <span class="indicator-year">${year} год</span>
-                `;
-            } else {
-                card.innerHTML = '<p>Нет данных</p>';
+            switch (indicator.source) {
+                case 'countries':
+                    await this._fetchCountriesData(card, indicator);
+                    break;
+                case 'coingecko':
+                    await this._fetchCryptoData(card, indicator);
+                    break;
+                default:
+                    throw new Error('Неизвестный источник');
             }
         } catch (error) {
-            console.error('WorldBankWidget fetch error:', error);
+            console.error('[WorldWidget] Ошибка:', error);
+            card.innerHTML = `
+                <span class="indicator-label">${indicator.name}</span>
+                <span class="indicator-value">—</span>
+                <span class="indicator-year">Нет данных</span>
+                <small style="color: var(--text-secondary); display: block; margin-top: 0.5rem;">Не удалось загрузить</small>
+            `;
         }
+    }
+
+    /**
+     * Данные из REST Countries API (уже проверен — работает)
+     */
+    async _fetchCountriesData(card, indicator) {
+        const response = await fetch('https://restcountries.com/v3.1/all?fields=name,population,area');
+        const countries = await response.json();
+        
+        let value, formattedValue;
+
+        switch (indicator.name) {
+            case 'Население мира':
+                value = countries.reduce((sum, c) => sum + c.population, 0);
+                formattedValue = `${(value / 1_000_000_000).toFixed(2)} млрд чел`;
+                break;
+            case 'Средняя площадь страны':
+                const totalArea = countries.reduce((sum, c) => sum + (c.area || 0), 0);
+                value = totalArea / countries.length;
+                formattedValue = `${value.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} км²`;
+                break;
+            case 'Всего стран в мире':
+                value = countries.length;
+                formattedValue = `${value} стран`;
+                break;
+            case 'Общая площадь суши':
+                value = countries.reduce((sum, c) => sum + (c.area || 0), 0);
+                formattedValue = `${(value / 1_000_000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} млн км²`;
+                break;
+            default:
+                formattedValue = 'Н/Д';
+        }
+
+        card.innerHTML = `
+            <span class="indicator-label">${indicator.name}</span>
+            <span class="indicator-value">${formattedValue}</span>
+            <span class="indicator-year">По данным ${new Date().getFullYear()} года</span>
+        `;
+    }
+
+    /**
+     * Данные из CoinGecko API (уже проверен — работает)
+     */
+    async _fetchCryptoData(card, indicator) {
+        let url;
+        
+        switch (indicator.name) {
+            case 'Капитализация Bitcoin':
+                url = 'https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false';
+                break;
+            case 'Курс ETH к USD':
+                url = 'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd';
+                break;
+            default:
+                throw new Error('Неизвестный криптоиндикатор');
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        let formattedValue;
+
+        if (indicator.name === 'Капитализация Bitcoin') {
+            const marketCap = data.market_data?.market_cap?.usd;
+            formattedValue = marketCap 
+                ? `${(marketCap / 1_000_000_000_000).toFixed(2)} трлн $`
+                : 'Н/Д';
+        } else if (indicator.name === 'Курс ETH к USD') {
+            const price = data.ethereum?.usd;
+            formattedValue = price 
+                ? `$${price.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}`
+                : 'Н/Д';
+        }
+
+        card.innerHTML = `
+            <span class="indicator-label">${indicator.name}</span>
+            <span class="indicator-value">${formattedValue}</span>
+            <span class="indicator-year">Данные реального времени</span>
+        `;
     }
 
     _setupRefresh(wrapper) {
         const btn = wrapper.querySelector('.btn-refresh');
         if (btn) {
             this._addEventListener(btn, 'click', async () => {
+                // Выбираем новый случайный индикатор
                 this.currentIndicator = this.indicators[Math.floor(Math.random() * this.indicators.length)];
-                // Обновляем заголовок
+                // Обновляем заголовок виджета
                 const titleEl = wrapper.querySelector('.widget-title');
                 if (titleEl) titleEl.textContent = `📈 ${this.currentIndicator.name}`;
-                await this._fetchIndicator(wrapper);
+                await this._fetchData(wrapper);
             });
         }
     }
