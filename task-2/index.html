@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Экономический дашборд | Coffee & Crypto</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <header class="dashboard-header">
+        <div class="header-left">
+            <h1>☕ Coffee & Crypto</h1>
+            <p class="subtitle">Экономический пульс планеты</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-add" data-widget="bigmac">
+                <i class="fa-solid fa-burger"></i> Индекс кофе
+            </button>
+            <button class="btn-add" data-widget="crypto">
+                <i class="fa-brands fa-bitcoin"></i> Крипто
+            </button>
+            <button class="btn-add" data-widget="country">
+                <i class="fa-solid fa-globe"></i> ВВП страны
+            </button>
+            <button class="btn-add" data-widget="worldbank">
+                <i class="fa-solid fa-chart-line"></i> Экономика
+            </button>
+        </div>
+    </header>
+
+    <main id="dashboard-grid" class="dashboard-grid">
+        <!-- Виджеты добавляются динамически -->
+    </main>
+
+    <footer class="dashboard-footer">
+        <p>
+            <strong>Использованная нейросеть:</strong> DeepSeek | 
+            <strong>Время выполнения:</strong> ~2 часа
+        </p>
+        <p>
+            <strong>JavaScript-функционал:</strong> Динамическое добавление/удаление виджетов, работа с Open Exchange Rates API, CoinGecko API, World Bank API. ООП-архитектура (наследование, инкапсуляция, полиморфизм).
+        </p>
+    </footer>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
