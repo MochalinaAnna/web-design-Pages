@@ -1,4 +1,175 @@
-/* ============ ОБНОВЛЁННЫЙ COUNTRY WIDGET ============ */
+/* ============ БАЗОВЫЙ ВИДЖЕТ ============ */
+.widget {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    box-shadow: var(--shadow);
+}
+
+.widget.widget-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1.2rem;
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border);
+}
+
+.widget-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.widget-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+
+.widget-close:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.widget-body {
+    padding: 1.2rem;
+}
+
+.widget-description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+/* ============ КНОПКА ОБНОВЛЕНИЯ ============ */
+.btn-refresh {
+    display: block;
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.6rem;
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: 0.2s;
+}
+
+.btn-refresh:hover {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+}
+
+/* ============ CRYPTO WIDGET ============ */
+.widget-crypto .crypto-display {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.crypto-main {
+    margin-bottom: 1rem;
+}
+
+.crypto-price {
+    display: block;
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--accent2);
+}
+
+.crypto-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.coffee-equivalent {
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    display: inline-block;
+}
+
+.coffee-icon {
+    font-size: 2rem;
+    display: block;
+}
+
+.coffee-count {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.coffee-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* ============ BIGMAC WIDGET ============ */
+.coffee-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.coffee-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+}
+
+.country-name {
+    font-weight: 500;
+}
+
+.coffee-cups {
+    font-weight: 600;
+    color: var(--accent);
+}
+
+/* ============ COUNTRY WIDGET ============ */
+.country-card {
+    text-align: center;
+}
+
+.country-flag {
+    width: 80px;
+    height: auto;
+    border-radius: 6px;
+    margin: 0 auto 0.8rem;
+    border: 2px solid var(--border);
+}
+
+.country-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.3rem;
+}
+
 .country-continent {
     font-size: 0.8rem;
     color: var(--accent);
@@ -39,7 +210,7 @@
 /* Индекс Биг-Мака */
 .bigmac-index {
     margin-top: 1rem;
-    background: linear-gradient(135deg, #f0883e22, #d2991d22);
+    background: linear-gradient(135deg, rgba(240, 136, 62, 0.13), rgba(210, 153, 29, 0.13));
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     padding: 1rem;
@@ -78,4 +249,31 @@
     font-size: 0.7rem;
     color: var(--text-secondary);
     font-style: italic;
+}
+
+/* ============ WORLD BANK / INDICATOR WIDGET ============ */
+.indicator-card {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.indicator-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.indicator-value {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--accent3);
+    margin-bottom: 0.3rem;
+}
+
+.indicator-year {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
 }
